@@ -210,7 +210,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     SCSubgraphRef  cnvArray = sc.Subgraph[3]; // Temporary array for CNV values
     SCSubgraphRef  smaArray = sc.Subgraph[4]; // Temporary array for SMA values
     cnvArray[sc.Index] =cnvArray[sc.Index-1] +nv;
-    // smaArray[sc.Index]=close;
+
     sc.SimpleMovAvg(cnvArray, smaArray, sc.Index, Length.GetFloat());
     static float cnv_tb =0;
     cnv_tb= cnvArray[sc.Index]-smaArray[sc.Index];
