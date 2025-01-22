@@ -177,14 +177,14 @@ SCSFExport scsf_ZoneColoredCandles(SCStudyInterfaceRef sc)
 	low[sc.Index] = min(lowRSI, min(open[sc.Index], close[sc.Index]));
 	message.Format("close---->: %.5f", close[sc.Index]);
 	sc.AddMessageToLog(message, 1);
-	// Define colors
-    int extra_extreme_buy_color = RGB(255, 0, 60);   // #ff003c
-    int extra_extreme_sell_color = RGB(0, 30, 255);   // #001eff
-    int sea_zone_upbar_color = RGB(0, 224, 64);       // #00e040
-    int sea_zone_downbar_color = RGB(224, 26, 0);     // #e01a00
-    int frontier_buy_sweep_color = RGB(0, 0, 0);       // #000000
-    int frontier_sell_sweep_color = RGB(0, 0, 0);      // #000000
-	int extreme_sell_1_color = RGB(214, 0, 51);
+	// // Define colors
+    // int extra_extreme_buy_color = RGB(255, 0, 60);   // #ff003c
+    // int extra_extreme_sell_color = RGB(0, 30, 255);   // #001eff
+    // int sea_zone_upbar_color = RGB(0, 224, 64);       // #00e040
+    // int sea_zone_downbar_color = RGB(224, 26, 0);     // #e01a00
+    // int frontier_buy_sweep_color = RGB(0, 0, 0);       // #000000
+    // int frontier_sell_sweep_color = RGB(0, 0, 0);      // #000000
+	// int extreme_sell_1_color = RGB(214, 0, 51);
 	
 	// Define zones
     bool extra_extreme_sell = close[sc.Index] > 30;

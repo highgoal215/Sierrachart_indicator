@@ -6,26 +6,41 @@ float f_zrsi(SCFloatArrayRef source, float length, SCStudyInterfaceRef sc)
 {   
     SCString message;
     SCSubgraphRef RSIArray = sc.Subgraph[5]; // Assuming Subgraph[5] is used for RSI values
-    sc.RSI(source, RSIArray, sc.Index ,MOVAVGTYPE_SIMPLE, length);
-    message.Format("RSIArray: %.5f", RSIArray[sc.Index]);
+    static float RSivalue=0;
+    sc.RSI(source, RSIArray, sc.Index , length);
+    RSivalue=RSIArray[sc.Index]-50;
+    message.Format("<============RSIArray1===========>: %.5f", RSIArray[sc.Index]);
 	sc.AddMessageToLog(message, 1);
-    return RSIArray[sc.Index];
+    message.Format("<============RSIArray===========>: %.5f", RSivalue);
+	sc.AddMessageToLog(message, 1);
+    return RSivalue;
 
+}
+// Function to calculate smoothed RSI
+float f_rsi(SCFloatArrayRef source, float length, bool mode, SCStudyInterfaceRef sc)
+{
+    float zrsi = f_zrsi(source, length, sc);
+    static float smoothed = 0;
+    if (sc.Index == 0)
+        smoothed = zrsi;
+    else
+        smoothed = (smoothed + zrsi) / 2;
+    return mode ? smoothed : zrsi;
 }
 // Function to calculate Heikin Ashi RSI
 void f_rsiHeikinAshi(float length, SCStudyInterfaceRef sc, float* open, float* high, float* low, float* close, float smothingget)
 {
     SCString message;
-    SCFloatArrayRef haOpen = sc.Subgraph[0].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
-    SCFloatArrayRef haHigh = sc.Subgraph[1].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
-    SCFloatArrayRef haLow = sc.Subgraph[2].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
-    SCFloatArrayRef haClose = sc.Subgraph[3].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
+    SCFloatArrayRef haOpen = sc.Subgraph[6].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
+    SCFloatArrayRef haHigh = sc.Subgraph[6].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
+    SCFloatArrayRef haLow = sc.Subgraph[8].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
+    SCFloatArrayRef haClose = sc.Subgraph[9].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
     haOpen[sc.Index] = (sc.Open[sc.Index ] + sc.Close[sc.Index]) / 2;
     haClose[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4;
     haHigh[sc.Index] = max(sc.High[sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
     haLow[sc.Index] = min(sc.Low[sc.Index], min(haOpen[sc.Index], haClose[sc.Index]));
     float Open1 = sc.BaseData[SC_OPEN][sc.Index];
-    message.Format("Haopen: %.5f", haOpen[sc.Index]);
+    message.Format("haclose: %.5f", haClose[sc.Index]);
 	sc.AddMessageToLog(message, 1);
     float closeRSI = f_zrsi(haClose, length, sc);
     message.Format("Open1: %.5f", Open1);
@@ -72,10 +87,11 @@ void PlotBars(SCStudyInterfaceRef sc, int index, bool condition, COLORREF color,
         tool.LineWidth = barwidth;
         tool.Region =0;
         // Plot the shape at the specified index
-        // sc.Subgraph[10].DataColor[sc.Index] = tool.Color;
-        // sc.Subgraph[10].DrawStyle = tool.DrawingType;
-        // sc.Subgraph[10][sc.Index] = tool.BeginValue;
+        sc.Subgraph[11].DataColor[sc.Index] = tool.Color;
+        sc.Subgraph[11].DrawStyle = tool.DrawingType;
+        sc.Subgraph[11][sc.Index] = tool.BeginValue;
         sc.UseTool(tool);
+        tool.Clear();
     }
 }
 void PlotLine(SCStudyInterfaceRef sc, int index, bool condition, COLORREF color, SCSubgraphRef subgraph)
@@ -86,6 +102,7 @@ void PlotLine(SCStudyInterfaceRef sc, int index, bool condition, COLORREF color,
     {
         // Create a shape tool
         s_UseTool tool;
+      
         tool.BeginDateTime = sc.BaseDateTimeIn[index]; // Use BaseDateTimeIn for time
         tool.EndDateTime = sc.BaseDateTimeIn[index]; // Same for end time
         tool.ChartNumber = sc.ChartNumber;
@@ -97,10 +114,11 @@ void PlotLine(SCStudyInterfaceRef sc, int index, bool condition, COLORREF color,
         tool.LineWidth = 1;
         tool.Region = 0;
         // Plot the shape at the specified index
-        // sc.Subgraph[10].DataColor[sc.Index] = tool.Color;
-        // sc.Subgraph[10].DrawStyle = tool.DrawingType;
-        // sc.Subgraph[10][sc.Index] = tool.BeginValue;
+        sc.Subgraph[10].DataColor[sc.Index] = tool.Color;
+        sc.Subgraph[10].DrawStyle = tool.DrawingType;
+        sc.Subgraph[10][sc.Index] = tool.BeginValue;
         sc.UseTool(tool);
+        tool.Clear();
     }
 }
 SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
@@ -188,11 +206,15 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
         BarSize.SetFloat(12);
         BarSize.SetFloatLimits(1,INT_MAX);
 
-//   // Subgraphs for candle properties
+// //   // Subgraphs for candle properties
 //         sc.Subgraph[0].Name = "Open";
+//         sc.Subgraph[0][sc.Index]=sc.Open[sc.Index];
 //         sc.Subgraph[1].Name = "High";
+//         sc.Subgraph[1][sc.Index]=sc.High[sc.Index];
 //         sc.Subgraph[2].Name = "Low";
-//         sc.Subgraph[3].Name = "Close";                  // Line width for candle borders
+//         sc.Subgraph[2][sc.Index]=sc.Low[sc.Index];
+//         sc.Subgraph[3].Name = "Close";             
+//         sc.Subgraph[3][sc.Index]=sc.Close[sc.Index];     // Line width for candle borders
 
   
         return;
@@ -279,23 +301,23 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     PlotLine(sc,sc.Index ,(sc.Close[sc.Index]>sc.Open[sc.Index]) ,sea_zone_upbar_color,sc.Subgraph[10]);
     PlotLine(sc,sc.Index ,(sc.Close[sc.Index]<=sc.Open[sc.Index]) ,candle_color,sc.Subgraph[10]);
 
-    PlotBars(sc, sc.Index, extra_extreme_sell, extra_extreme_sell_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_1, extreme_sell_1_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_2, extreme_sell_2_color, sc.Subgraph[10] , candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_3, extreme_sell_3_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_4, extreme_sell_4_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, fr_sel_sweep, frontier_sell_sweep_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, frontier_sell, frontier_sell_color, sc.Subgraph[10], candleBarSize);
+    PlotBars(sc, sc.Index, extra_extreme_sell, extra_extreme_sell_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, extreme_sell_1, extreme_sell_1_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, extreme_sell_2, extreme_sell_2_color, sc.Subgraph[11] , candleBarSize);
+    PlotBars(sc, sc.Index, extreme_sell_3, extreme_sell_3_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, extreme_sell_4, extreme_sell_4_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, fr_sel_sweep, frontier_sell_sweep_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, frontier_sell, frontier_sell_color, sc.Subgraph[11], candleBarSize);
     // Plotting shapes for Extreme Buy Zones
-    PlotBars(sc, sc.Index, extra_extreme_buy, extra_extreme_buy_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_1, extreme_buy_1_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_2, extreme_buy_2_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_3, extreme_buy_3_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_4, extreme_buy_4_color , sc.Subgraph[10], candleBarSize);
+    PlotBars(sc, sc.Index, extra_extreme_buy, extra_extreme_buy_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, extreme_buy_1, extreme_buy_1_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, extreme_buy_2, extreme_buy_2_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, extreme_buy_3, extreme_buy_3_color, sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, extreme_buy_4, extreme_buy_4_color , sc.Subgraph[11], candleBarSize);
     PlotBars(sc, sc.Index, frontier_buy, frontier_buy_color, sc.Subgraph[10], candleBarSize);
-    PlotBars(sc,sc.Index ,fr_buy_sweep ,candle_color,sc.Subgraph[10], candleBarSize);
-    PlotBars(sc,sc.Index ,(sc.Close[sc.Index]>sc.Open[sc.Index]) ,sea_zone_upbar_color,sc.Subgraph[10], candleBarSize);
-    PlotBars(sc,sc.Index ,(sc.Close[sc.Index]<=sc.Open[sc.Index]) ,candle_color,sc.Subgraph[10], candleBarSize);
+    PlotBars(sc,sc.Index ,fr_buy_sweep ,candle_color,sc.Subgraph[11], candleBarSize);
+    PlotBars(sc,sc.Index ,(sc.Close[sc.Index]>sc.Open[sc.Index]) ,sea_zone_upbar_color,sc.Subgraph[11], candleBarSize);
+    PlotBars(sc,sc.Index ,(sc.Close[sc.Index]<=sc.Open[sc.Index]) ,candle_color,sc.Subgraph[11], candleBarSize);
     
     s_UseTool hline_tool;
 
