@@ -84,12 +84,13 @@ void PlotBars(SCStudyInterfaceRef sc, int index,  COLORREF color, SCSubgraphRef 
     ToolBody.Region = 1; // Draw in the subgraph region
     ToolBody.BeginDateTime = sc.BaseDateTimeIn[index] ; // Left edge of rectangle
     ToolBody.EndDateTime = sc.BaseDateTimeIn[index];   // Right edge of rectangle
-    ToolBody.BeginValue = min(CustomOpen, CustomClose);    // Bottom of rectangle
-    ToolBody.EndValue = max(CustomOpen, CustomClose);      // Top of rectangle
+    ToolBody.BeginValue = sc.BaseData[SC_LAST][index-1];    // Bottom of rectangle
+    ToolBody.EndValue = CustomClose;      // Top of rectangle
     ToolBody.Color = color;
     sc.Subgraph[0][index] =ToolBody.BeginValue;  // Open
     sc.Subgraph[1][index] =ToolBody.EndValue; // Close
     sc.Subgraph[0].DataColor[index]=ToolBody.Color;
+    sc.Subgraph[1].DataColor[index]=ToolBody.Color;
     sc.UseTool(ToolBody);
     // Set subgraph values
 }
@@ -117,6 +118,8 @@ void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef s
         ToolWick.Color = color;
         sc.Subgraph[2][index] = ToolWick.BeginValue;  // Open
         sc.Subgraph[3][index] =ToolWick.EndValue; // Close
+        sc.Subgraph[2].DataColor[index]=ToolWick.Color;
+        sc.Subgraph[3].DataColor[index]=ToolWick.Color;
         sc.UseTool(ToolWick);
     }
 }
