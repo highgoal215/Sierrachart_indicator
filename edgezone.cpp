@@ -9,56 +9,47 @@ float f_zrsi(SCFloatArrayRef source, float length, SCStudyInterfaceRef sc)
     static float RSivalue=0;
     sc.RSI(source, RSIArray, sc.Index , length);
     RSivalue=RSIArray[sc.Index]-50;
-  
     message.Format("<============RSIArray===========>: %.5f", RSivalue);
 	sc.AddMessageToLog(message, 1);
     return RSivalue;
 
 }
-// Function to calculate smoothed RSI
-float f_rsi(SCFloatArrayRef source, float length, bool mode, SCStudyInterfaceRef sc)
-{   SCString message;
-    float zrsi = f_zrsi(source, length, sc);
-      message.Format("<============ZRi===========>: %.5f", zrsi);
-	sc.AddMessageToLog(message, 1);
-    static float smoothed = 0;
-    if (sc.Index == 0)
-        smoothed = zrsi;
-    else
-        smoothed = (smoothed + zrsi) / 2;
-    return mode ? smoothed : zrsi;
-}
+
 // Function to calculate Heikin Ashi RSI
-void f_rsiHeikinAshi(float length, SCStudyInterfaceRef sc, float* open, float* high, float* low, float* close, float smothingget)
+void f_rsiHeikinAshi(float length, SCStudyInterfaceRef sc, float* open, float* high, float* low, float* close, float smothingget , float getSource)
 {
     SCString message;
     SCFloatArrayRef haOpen = sc.Subgraph[6].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
     SCFloatArrayRef haHigh = sc.Subgraph[6].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
     SCFloatArrayRef haLow = sc.Subgraph[8].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
     SCFloatArrayRef haClose = sc.Subgraph[9].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
-    haOpen[sc.Index] = (sc.BaseData[SC_OPEN][sc.Index ] + sc.BaseData[SC_LAST][sc.Index-1]) / 2;
-    haClose[sc.Index] = (sc.BaseData[SC_OPEN][sc.Index ]  + sc.BaseData[SC_HIGH][sc.Index] + sc.BaseData[SC_LOW][sc.Index] + sc.BaseData[SC_LAST][sc.Index]) / 4;
-    haHigh[sc.Index] = max(sc.BaseData[SC_HIGH][sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
-    haLow[sc.Index] = min(sc.BaseData[SC_LOW][sc.Index], min(haOpen[sc.Index], haClose[sc.Index]));
-    float Open1 = sc.BaseData[SC_OPEN][sc.Index];
-    message.Format("haclose: %.5f", haClose[sc.Index]);
-	sc.AddMessageToLog(message, 1);
-    float closeRSI = f_zrsi(haClose, length, sc);
-    message.Format("Open1: %.5f", closeRSI);
-	sc.AddMessageToLog(message, 1);
+    haOpen[sc.Index] = (sc.Open[sc.Index -1] + sc.Close[sc.Index-1]) / 2.0f;
+    haClose[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
+    haHigh[sc.Index] = max(sc.High[sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
+    haLow[sc.Index] = min(sc.Low[sc.Index], min(haOpen[sc.Index], haClose[sc.Index]));
+    SCFloatArrayRef source = sc.BaseData[getSource];
+    float closeRSI = f_zrsi(source, length, sc);
     float openRSI = closeRSI;
     float highRSI_raw = f_zrsi(haHigh, length, sc);
     float lowRSI_raw = f_zrsi(haLow, length, sc);
     float highRSI = max(highRSI_raw, lowRSI_raw);
     float lowRSI = min(highRSI_raw, lowRSI_raw);
-    *close = (openRSI + highRSI + lowRSI + closeRSI) / 4;
+    *close = (openRSI + highRSI + lowRSI + closeRSI) / 4.0f;
 
+    message.Format("haopen: %.5f", source[sc.Index]);
+	sc.AddMessageToLog(message, 1);
+    message.Format("haclose: %.5f", haClose[sc.Index]);
+	sc.AddMessageToLog(message, 1);
+    message.Format("Opem----->: %.5f", sc.Open[sc.Index]);
+	sc.AddMessageToLog(message, 1);
+    message.Format("Close====>: %.5f", sc.Close[sc.Index]);
+	sc.AddMessageToLog(message, 1);
     static float prev_open = 0;
-    // if (sc.Index == 0)
-    // {
-    //     *open = (openRSI + closeRSI) / 2;
-    // }
-    // else
+    if (sc.Index == 0)
+    {
+        *open = (openRSI + closeRSI) / 2.0f;
+    }
+    else
     {
         *open = (prev_open * smothingget+ (*close)) / (smothingget + 1);
     }
@@ -67,63 +58,62 @@ void f_rsiHeikinAshi(float length, SCStudyInterfaceRef sc, float* open, float* h
     *low = min(lowRSI, min((*open), (*close)));
 
 }
-void PlotBars(SCStudyInterfaceRef sc, int index, bool condition, COLORREF color, SCSubgraphRef subgraph , float &barwidth)
+void PlotBars(SCStudyInterfaceRef sc, int index,  COLORREF color, SCSubgraphRef subgraph0, SCSubgraphRef subgraph1, float &barwidth)
 {
     SCString message; // Missing semicolon added here
 
-    if (condition)
-    {
-        // Create a shape tool
-        s_UseTool Body;
-        Body.Clear();
-        Body.BeginDateTime = sc.BaseDateTimeIn[index]; // Use BaseDateTimeIn for time
-        Body.EndDateTime = sc.BaseDateTimeIn[index]; // Same for end time
-        Body.ChartNumber = sc.ChartNumber;
-        Body.DrawingType = DRAWING_LINE; // Example of a shape type
-        // Body.MarkerType=MARKER_SQUARE;
-
-        Body.BeginValue = sc.BaseData[SC_OPEN][index] ; // Use the close price for the Y value
-        Body.EndValue=sc.Close[index];
-        Body.AddMethod = UTAM_ADD_OR_ADJUST;
-        Body.Color = color;
-        Body.LineWidth = barwidth;
-        Body.Region =subgraph[11];
-    
-        // Plot the shape at the specified index
-        sc.Subgraph[11].DataColor[sc.Index] = Body.Color;
-        sc.Subgraph[11].DrawStyle = Body.DrawingType;
-        sc.Subgraph[11].Arrays[0][sc.Index] = Body.BeginValue;
-        sc.Subgraph[11].Arrays[1][sc.Index] = Body.EndValue;
-        sc.UseTool(Body);
-    }
+    float CustomOpen =sc.Open[index];
+    float CustomClose =sc.Close[index];
+    s_UseTool ToolBody;
+    ToolBody.Clear();
+    // Create a shape tool
+    ToolBody.ChartNumber = sc.ChartNumber;
+    ToolBody.Color = color;
+    ToolBody.LineWidth=barwidth;
+    ToolBody.Region = 1; // Draw in the subgraph region
+    ToolBody.BeginDateTime = sc.BaseDateTimeIn[index] ; // Left edge of rectangle
+    ToolBody.EndDateTime = sc.BaseDateTimeIn[index];   // Right edge of rectangle
+    ToolBody.BeginValue = CustomOpen;    // Bottom of rectangle
+    ToolBody.EndValue = CustomClose;      // Top of rectangle
+    ToolBody.DrawingType = DRAWING_LINE;
+    ToolBody.AddMethod = UTAM_ADD_OR_ADJUST;
+    sc.UseTool(ToolBody);
+    sc.Subgraph[0][index] =ToolBody.BeginValue;  // Open
+    sc.Subgraph[1][index] =ToolBody.EndValue; // Close
+    sc.Subgraph[0].DataColor[index]=ToolBody.Color;
+    sc.Subgraph[1].DataColor[index]=ToolBody.Color;
+    sc.Subgraph[0].DrawStyle=DRAWSTYLE_POINT;
+    sc.Subgraph[0].LineWidth=1;
+    sc.Subgraph[1].DrawStyle=DRAWSTYLE_POINT;
+    sc.Subgraph[1].LineWidth=1;
+    // Set subgraph values
 }
-void PlotLine(SCStudyInterfaceRef sc, int index, bool condition, COLORREF color, SCSubgraphRef subgraph)
+void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef subgraph3, SCSubgraphRef subgraph2)
 {
     SCString message; // Missing semicolon added here
 
-    if (condition)
     {
-        // Create a shape tool
-        s_UseTool Wick;
-        Wick.Clear();
-        Wick.BeginDateTime = sc.BaseDateTimeIn[index]; // Use BaseDateTimeIn for time
-        Wick.EndDateTime = sc.BaseDateTimeIn[index]; // Same for end time
-        Wick.ChartNumber = sc.ChartNumber;
-        Wick.DrawingType = DRAWING_LINE; // Example of a shape type
-        Wick.BeginValue = sc.BaseData[SC_HIGH][index]; // Use the close price for the Y value
-        Wick.EndValue=sc.BaseData[SC_LOW][index];
-        Wick.AddMethod = UTAM_ADD_OR_ADJUST;
-        Wick.Color = color;
-        Wick.LineWidth = 1;
-        Wick.Region = subgraph[10];
-      
-        // Plot the shape at the specified index
-        sc.Subgraph[10].DataColor[sc.Index] = Wick.Color;
-        sc.Subgraph[10].DrawStyle = Wick.DrawingType;
-        sc.Subgraph[10].Arrays[0][sc.Index] = Wick.BeginValue;
-        sc.Subgraph[10].Arrays[1][sc.Index] = Wick.EndValue;
-        sc.UseTool(Wick);
-    
+
+             // Create a shape tool
+        float CustomHigh = sc.High[index];
+        float CustomLow =sc.Low[index];
+        s_UseTool ToolWick;
+        ToolWick.Clear();
+        ToolWick.ChartNumber = sc.ChartNumber;
+        ToolWick.Color = color;
+        ToolWick.LineWidth=1;
+        ToolWick.Region = 1; // Draw in the subgraph region
+        ToolWick.BeginDateTime = sc.BaseDateTimeIn[index] ; // Left edge of rectangle
+        ToolWick.EndDateTime = sc.BaseDateTimeIn[index];   // Right edge of rectangle
+        ToolWick.BeginValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])? CustomLow :CustomHigh;    // Bottom of rectangle
+        ToolWick.EndValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])?  CustomHigh :CustomLow ;      // Top of rectangle
+        ToolWick.DrawingType = DRAWING_LINE;
+        ToolWick.AddMethod = UTAM_ADD_OR_ADJUST;
+        sc.UseTool(ToolWick);
+        sc.Subgraph[2][index] = ToolWick.BeginValue;  // Open
+        sc.Subgraph[3][index] =ToolWick.EndValue; // Close
+        sc.Subgraph[2].DataColor[index]=ToolWick.Color;
+        sc.Subgraph[3].DataColor[index]=ToolWick.Color;
     }
 }
 SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
@@ -142,7 +132,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     SCInputRef LowerOSExtreme = sc.Input[8];
     SCInputRef Length = sc.Input[9];
     SCInputRef ShowZones = sc.Input[10];
-    SCInputRef BarSize=sc.Input[11];
+    SCInputRef BarSize=sc.Input[8];
     //color define
     COLORREF extra_extreme_buy_color = RGB(255, 0, 60); // #ff003c
     COLORREF extra_extreme_sell_color =RGB(0, 30, 255); // #001eff
@@ -179,7 +169,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
         Smoothing.SetFloatLimits(1, 100);
 
         Source.Name = "Source";
-        Source.SetInputDataIndex(SC_OHLC);
+        Source.SetInputDataIndex(SC_HLC_AVG);
 
         LengthRSI.Name = "Length RSI";
         LengthRSI.SetFloat(7);
@@ -208,47 +198,30 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
         Length.SetFloat(20);
         Length.SetFloatLimits(1, INT_MAX);
         BarSize.Name="Bar Size";
-        BarSize.SetFloat(8);
+        BarSize.SetFloat(6);
         BarSize.SetFloatLimits(1,INT_MAX);
 
-// //   // Subgraphs for candle properties
-        // sc.Subgraph[10].Name = "wick";
-        // sc.Subgraph[10].DataColor[sc.Index] =RGB(255,255,255);
-        // sc.Subgraph[10].DrawStyle = DRAWSTYLE_LINE;
-        // sc.Subgraph[10].Arrays[0][sc.Index] = sc.BaseData[SC_HIGH][sc.Index];
-        // sc.Subgraph[10].Arrays[1][sc.Index] = sc.BaseData[SC_LOW][sc.Index];
-        // sc.Subgraph[11].Name = "ZoneColor";
-        // sc.Subgraph[11].DataColor[sc.Index] = RGB(255,255,255);
-        // sc.Subgraph[11].DrawStyle = DRAWSTYLE_BAR;
-        // sc.Subgraph[11].Arrays[0][sc.Index] =sc.BaseData[SC_OPEN][sc.Index];
-        // sc.Subgraph[11].Arrays[1][sc.Index] = sc.BaseData[SC_LAST][sc.Index];
-        //         sc.Subgraph[0].Name = "Open";
+        // Configure the subgraphs for open and close lines
+        sc.Subgraph[0].Name = "Open";
+        sc.Subgraph[0].DrawStyle = DRAWSTYLE_POINT;
+        sc.Subgraph[1].Name = "Close";
+        sc.Subgraph[1].DrawStyle = DRAWSTYLE_POINT;
+        sc.Subgraph[2].Name = "High";
+        sc.Subgraph[2].DrawStyle = DRAWSTYLE_POINT;
+        sc.Subgraph[3].Name = "Low";
+        sc.Subgraph[3].DrawStyle = DRAWSTYLE_POINT;
 
-        sc.Subgraph[11].Name = "Open";
-        sc.Subgraph[11][sc.Index]= sc.BaseData[SC_OPEN][sc.Index];
-        sc.Subgraph[11].Name = "Close";             
-        sc.Subgraph[11][sc.Index]=sc.BaseData[SC_LAST][sc.Index];            
-        sc.Subgraph[10].Name = "High";
-        sc.Subgraph[10][sc.Index]= sc.BaseData[SC_HIGH][sc.Index];
-        sc.Subgraph[10].Name = "Low";
-        sc.Subgraph[10][sc.Index]=sc.BaseData[SC_LOW][sc.Index];
-    // Line width for candle borders
-  
         return;
     }
- message.Format("III________________>: %.5f", sc.Open[sc.Index]);
-	sc.AddMessageToLog(message, 1);
-    // SCSubgraphRef ZoneColor=sc.Subgraph[0];
-    // ZoneColor.Name="ZoneColor";
-    // ZoneColor.Arrays[0]=sc.Subgraph[10];
-
     float smothingget=Smoothing.GetFloat();
     float candleBarSize=BarSize.GetFloat();
+    float getSource=Source.GetFloat();
     float open=0.0f;
     float high=0.0f; 
     float low=0.0f ;
     float close=0.0f;
-    f_rsiHeikinAshi(LengthHARSI.GetFloat(), sc, &open, &high, &low, &close , smothingget);
+    
+    f_rsiHeikinAshi(LengthHARSI.GetFloat(), sc, &open, &high, &low, &close , smothingget, getSource);
 
     message.Format("close==================>: %.5f", close);
 	sc.AddMessageToLog(message, 1);
@@ -309,73 +282,69 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     else  (sc.Close[sc.Index]>sc.Open[sc.Index]) ?
     candle_color=sea_zone_upbar_color: candle_color=sea_zone_downbar_color;
 
-    PlotLine(sc, sc.Index, extra_extreme_sell, extra_extreme_sell_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_sell_1, extreme_sell_1_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_sell_2, extreme_sell_2_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_sell_3, extreme_sell_3_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_sell_4, extreme_sell_4_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, fr_sel_sweep, frontier_sell_sweep_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, frontier_sell, frontier_sell_color, sc.Subgraph[10]);
-    // Plotting shapes for Extreme Buy Zones
-    PlotLine(sc, sc.Index, extra_extreme_buy, extra_extreme_buy_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_buy_1, extreme_buy_1_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_buy_2, extreme_buy_2_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_buy_3, extreme_buy_3_color, sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, extreme_buy_4, extreme_buy_4_color , sc.Subgraph[10]);
-    PlotLine(sc, sc.Index, frontier_buy, frontier_buy_color, sc.Subgraph[10]);
-    PlotLine(sc,sc.Index ,fr_buy_sweep ,candle_color,sc.Subgraph[10]);
-    PlotLine(sc,sc.Index ,(sc.Close[sc.Index]>sc.Open[sc.Index]) ,sea_zone_upbar_color,sc.Subgraph[10]);
-    PlotLine(sc,sc.Index ,(sc.Close[sc.Index]<sc.Open[sc.Index]) ,candle_color,sc.Subgraph[10]);
-
-    PlotBars(sc, sc.Index, extra_extreme_sell, extra_extreme_sell_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_1, extreme_sell_1_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_2, extreme_sell_2_color, sc.Subgraph[11] , candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_3, extreme_sell_3_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_sell_4, extreme_sell_4_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, fr_sel_sweep, frontier_sell_sweep_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, frontier_sell, frontier_sell_color, sc.Subgraph[11], candleBarSize);
-    // Plotting shapes for Extreme Buy Zones
-    PlotBars(sc, sc.Index, extra_extreme_buy, extra_extreme_buy_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_1, extreme_buy_1_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_2, extreme_buy_2_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_3, extreme_buy_3_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, extreme_buy_4, extreme_buy_4_color , sc.Subgraph[11], candleBarSize);
-    PlotBars(sc, sc.Index, frontier_buy, frontier_buy_color, sc.Subgraph[11], candleBarSize);
-    PlotBars(sc,sc.Index ,fr_buy_sweep ,candle_color,sc.Subgraph[11], candleBarSize);
-    PlotBars(sc,sc.Index ,(sc.Close[sc.Index]>sc.Open[sc.Index]) ,sea_zone_upbar_color,sc.Subgraph[11], candleBarSize);
-    PlotBars(sc,sc.Index ,(sc.Close[sc.Index]<=sc.Open[sc.Index]) ,candle_color,sc.Subgraph[11], candleBarSize);
+    PlotBars(sc, sc.Index, candle_color, sc.Subgraph[0],sc.Subgraph[1], candleBarSize);
+    PlotLine(sc, sc.Index, candle_color, sc.Subgraph[2],sc.Subgraph[3] );
     
-    s_UseTool hline_tool;
-
-	hline_tool.Clear();
-	hline_tool.ChartNumber= sc.ChartNumber;
-
-	hline_tool.DrawingType= DRAWING_HORIZONTALLINE;
-
-	hline_tool.BeginIndex= sc.Index; 
-	hline_tool.BeginValue= UpperOBExtreme.GetFloat(); 
-	hline_tool.Color= RGB(0,0,255); 
-	hline_tool.LineStyle= LINESTYLE_SOLID; 
-    hline_tool.Region=0;
-	sc.UseTool(hline_tool);
-
-	hline_tool.BeginIndex=  sc.Index; 
-	hline_tool.BeginValue= UpperOB.GetFloat(); 
-	hline_tool.Color= RGB(0,0,128);
-    hline_tool.Region=0;
-	sc.UseTool(hline_tool);
-
-	hline_tool.BeginIndex=  sc.Index; 
-	hline_tool.BeginValue= LowerOS.GetFloat(); 
-	hline_tool.Color= RGB(255,0,0);
-    hline_tool.Region=0;
-	sc.UseTool(hline_tool);
-
-	hline_tool.BeginIndex=  sc.Index; 
-	hline_tool.BeginValue= LowerOSExtreme.GetFloat(); 
-	hline_tool.Color= RGB(128,0,0);
-    hline_tool.Region=0;
-	sc.UseTool(hline_tool);
+       // Plot "Upper Extreme" horizontal line
+    s_UseTool ToolUpperExtreme;
+    ToolUpperExtreme.Clear();
+    ToolUpperExtreme.ChartNumber = sc.ChartNumber;
+    ToolUpperExtreme.DrawingType = DRAWING_HORIZONTALLINE;
+    ToolUpperExtreme.AddMethod = UTAM_ADD_OR_ADJUST;
+    ToolUpperExtreme.BeginValue =UpperOBExtreme.GetFloat(); 
+    ToolUpperExtreme.Color = RGB(0, 0, 255);  // Blue color
+    ToolUpperExtreme.LineWidth = 2;
+    ToolUpperExtreme.TransparencyLevel = 50;
+    ToolUpperExtreme.Text = "Upper Extreme";
+    ToolUpperExtreme.Region = 1;  // Main price graph
+    sc.Subgraph[10][sc.Index]=ToolUpperExtreme.BeginValue;
+    sc.Subgraph[10].DataColor[sc.Index]=ToolUpperExtreme.Color;
+    sc.UseTool(ToolUpperExtreme);
+    // Plot "Upper" horizontal line
+    s_UseTool ToolUpper;
+    ToolUpper.Clear();
+    ToolUpper.ChartNumber = sc.ChartNumber;
+    ToolUpper.DrawingType = DRAWING_HORIZONTALLINE;
+    ToolUpper.AddMethod = UTAM_ADD_OR_ADJUST;
+    ToolUpper.BeginValue =UpperOB.GetFloat(); 
+    ToolUpper.Color = RGB(0, 0, 200);  // Slightly darker blue
+    ToolUpper.LineWidth = 1;
+    ToolUpper.TransparencyLevel = 70;
+    ToolUpper.Text = "Upper";
+    ToolUpper.Region = 1;
+    sc.Subgraph[11][sc.Index]=ToolUpper.BeginValue;
+    sc.Subgraph[11].DataColor[sc.Index]=ToolUpper.Color;
+    sc.UseTool(ToolUpper);
+    // Plot "Lower" horizontal line
+    s_UseTool ToolLower;
+    ToolLower.Clear();
+    ToolLower.ChartNumber = sc.ChartNumber;
+    ToolLower.DrawingType = DRAWING_HORIZONTALLINE;
+    ToolLower.AddMethod = UTAM_ADD_OR_ADJUST;
+    ToolLower.BeginValue =LowerOS.GetFloat(); 
+    ToolLower.Color = RGB(200, 0, 0);  // Slightly darker red
+    ToolLower.LineWidth = 1;
+    ToolLower.TransparencyLevel = 70;
+    ToolLower.Text = "Lower";
+    ToolLower.Region = 1;
+    sc.Subgraph[12][sc.Index]=ToolLower.BeginValue ;
+    sc.Subgraph[12].DataColor[sc.Index]=ToolLower.Color;
+    sc.UseTool(ToolLower);
+    // Plot "Lower Extreme" horizontal line
+    s_UseTool ToolLowerExtreme;
+    ToolLowerExtreme.Clear();
+    ToolLowerExtreme.ChartNumber = sc.ChartNumber;
+    ToolLowerExtreme.DrawingType = DRAWING_HORIZONTALLINE;
+    ToolLowerExtreme.AddMethod = UTAM_ADD_OR_ADJUST;
+    ToolLowerExtreme.BeginValue = LowerOSExtreme.GetFloat(); 
+    ToolLowerExtreme.Color = RGB(255, 0, 0);  // Bright red
+    ToolLowerExtreme.LineWidth = 2;
+    ToolLowerExtreme.TransparencyLevel = 50;
+    ToolLowerExtreme.Text = "Lower Extreme";
+    ToolLowerExtreme.Region = 1;
+    sc.Subgraph[13][sc.Index]=ToolLowerExtreme.BeginValue;
+    sc.Subgraph[13].DataColor[sc.Index]=ToolLowerExtreme.Color;
+    sc.UseTool(ToolLowerExtreme);
 
     
 

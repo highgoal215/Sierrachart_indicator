@@ -84,7 +84,7 @@ void PlotBars(SCStudyInterfaceRef sc, int index,  COLORREF color, SCSubgraphRef 
     ToolBody.Region = 1; // Draw in the subgraph region
     ToolBody.BeginDateTime = sc.BaseDateTimeIn[index] ; // Left edge of rectangle
     ToolBody.EndDateTime = sc.BaseDateTimeIn[index];   // Right edge of rectangle
-    ToolBody.BeginValue = sc.BaseData[SC_LAST][index-1];    // Bottom of rectangle
+    ToolBody.BeginValue = CustomOpen;    // Bottom of rectangle
     ToolBody.EndValue = CustomClose;      // Top of rectangle
     ToolBody.Color = color;
     sc.Subgraph[0][index] =ToolBody.BeginValue;  // Open
@@ -113,8 +113,8 @@ void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef s
         ToolWick.Region = 1; // Draw in the subgraph region
         ToolWick.BeginDateTime = sc.BaseDateTimeIn[index] ; // Left edge of rectangle
         ToolWick.EndDateTime = sc.BaseDateTimeIn[index];   // Right edge of rectangle
-        ToolWick.BeginValue = min(CustomHigh, CustomLow);    // Bottom of rectangle
-        ToolWick.EndValue = max(CustomHigh, CustomLow);      // Top of rectangle
+        ToolWick.BeginValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])? CustomLow :CustomHigh;    // Bottom of rectangle
+        ToolWick.EndValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])?  CustomHigh :CustomLow ;      // Top of rectangle
         ToolWick.Color = color;
         sc.Subgraph[2][index] = ToolWick.BeginValue;  // Open
         sc.Subgraph[3][index] =ToolWick.EndValue; // Close
@@ -304,6 +304,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     ToolUpperExtreme.Text = "Upper Extreme";
     ToolUpperExtreme.Region = 1;  // Main price graph
     sc.Subgraph[10][sc.Index]=ToolUpperExtreme.BeginValue;
+    sc.Subgraph[10].DataColor[sc.Index]=ToolUpperExtreme.Color;
     sc.UseTool(ToolUpperExtreme);
     // Plot "Upper" horizontal line
     s_UseTool ToolUpper;
@@ -318,6 +319,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     ToolUpper.Text = "Upper";
     ToolUpper.Region = 1;
     sc.Subgraph[11][sc.Index]=ToolUpper.BeginValue;
+    sc.Subgraph[11].DataColor[sc.Index]=ToolUpper.Color;
     sc.UseTool(ToolUpper);
     // Plot "Lower" horizontal line
     s_UseTool ToolLower;
@@ -332,6 +334,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     ToolLower.Text = "Lower";
     ToolLower.Region = 1;
     sc.Subgraph[12][sc.Index]=ToolLower.BeginValue ;
+    sc.Subgraph[12].DataColor[sc.Index]=ToolLower.Color;
     sc.UseTool(ToolLower);
     // Plot "Lower Extreme" horizontal line
     s_UseTool ToolLowerExtreme;
@@ -346,6 +349,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     ToolLowerExtreme.Text = "Lower Extreme";
     ToolLowerExtreme.Region = 1;
     sc.Subgraph[13][sc.Index]=ToolLowerExtreme.BeginValue;
+    sc.Subgraph[13].DataColor[sc.Index]=ToolLowerExtreme.Color;
     sc.UseTool(ToolLowerExtreme);
 
     
