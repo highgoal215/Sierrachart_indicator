@@ -1,7 +1,48 @@
 #include "sierrachart.h"
 SCDLLName("Edge Zone")
 
+float f_zrsi(SCFloatArrayRef source, float length, SCStudyInterfaceRef sc)
+{   
+    SCString message;
+    SCSubgraphRef RSIArray = sc.Subgraph[5]; // Assuming Subgraph[5] is used for RSI values
+    static float RSivalue=0;
+    sc.RSI(source, RSIArray, sc.Index, length);
+    RSivalue=RSIArray[sc.Index]-50;
+    return RSivalue;
 
+}
+// Function to calculate Heikin Ashi RSI
+void f_rsiHeikinAshi(float length, SCStudyInterfaceRef sc, float* open, float* high, float* low, float* close, float smothingget)
+{
+    SCString message;
+    SCFloatArrayRef haOpen = sc.Subgraph[6].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
+    SCFloatArrayRef haHigh = sc.Subgraph[7].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
+    SCFloatArrayRef haLow = sc.Subgraph[8].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
+    SCFloatArrayRef haClose = sc.Subgraph[9].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
+    haOpen[sc.Index] = (sc.Open[sc.Index ] + sc.Close[sc.Index]) / 2.0f;
+    haClose[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
+    haHigh[sc.Index] = max(sc.High[sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
+    haLow[sc.Index] = min(sc.Low[sc.Index], min(haOpen[sc.Index], haClose[sc.Index]));
+    float closeRSI = f_zrsi(haClose, length, sc);
+    float openRSI = closeRSI;
+    float highRSI_raw = f_zrsi(haHigh, length, sc);
+    float lowRSI_raw = f_zrsi(haLow, length, sc);
+    float highRSI = max(highRSI_raw, lowRSI_raw);
+    float lowRSI = min(highRSI_raw, lowRSI_raw);
+    *close = (openRSI + highRSI + lowRSI + closeRSI) / 4.0f;
+	sc.AddMessageToLog(message, 1);
+    if (sc.Index == 0)
+        {
+            *open = (openRSI + closeRSI) / 2.0f;
+        }
+        else
+        {
+            *open = ((*open) * smothingget+ (*close)) / (smothingget + 1);
+        }
+    *high = max(highRSI, max((*open), (*close)));
+    *low = min(lowRSI, min((*open), (*close)));
+
+}
 void PlotBars(SCStudyInterfaceRef sc, int index,  COLORREF color, SCSubgraphRef subgraph0, SCSubgraphRef subgraph1, float &barwidth)
 {
     float CustomOpen =sc.Open[index];
@@ -44,8 +85,8 @@ void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef s
         ToolWick.Region = 1; // Draw in the subgraph region
         ToolWick.BeginDateTime = sc.BaseDateTimeIn[index]; 
         ToolWick.EndDateTime = sc.BaseDateTimeIn[index];  
-        ToolWick.BeginValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])? CustomLow :CustomHigh;    
-        ToolWick.EndValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])?  CustomHigh :CustomLow ;      
+        ToolWick.BeginValue =  min(sc.High[sc.Index], min(sc.Open[sc.Index], sc.Close[sc.Index]));  
+        ToolWick.EndValue =max(sc.High[sc.Index], max(sc.Open[sc.Index], sc.Close[sc.Index]));      
         ToolWick.DrawingType = DRAWING_LINE;
         ToolWick.AddMethod = UTAM_ADD_OR_ADJUST;
         sc.UseTool(ToolWick);
@@ -59,10 +100,6 @@ void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef s
 }
 SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
 {
-    float open=0.0f;
-    float high=0.0f; 
-    float low=0.0f ;
-    float close=0.0f;
     // Define input parameters
     SCInputRef LengthHARSI = sc.Input[0];
     SCInputRef Smoothing = sc.Input[1];
@@ -88,7 +125,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     COLORREF extreme_sell_3_color=RGB(255,255,0);
     COLORREF extreme_sell_4_color=RGB(255,255,255);
     COLORREF extreme_buy_1_color = RGB(255, 0, 255); // #d60033
-    COLORREF extreme_buy_2_color=RGB(126,0,126);
+    COLORREF extreme_buy_2_color=RGB(128,0,128);
     COLORREF extreme_buy_3_color=RGB(0,255,255);
     COLORREF extreme_buy_4_color=RGB(255,255,255);
     COLORREF frontier_sell_color=RGB(33,150,243);
@@ -166,74 +203,32 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
 
     float smothingget=Smoothing.GetFloat();
     float candleBarSize=BarSize.GetFloat();
-
-    // Subgraphs
-    SCFloatArrayRef RSI_HA_Open = sc.Subgraph[12].Data;
-    SCFloatArrayRef RSI_HA_High = sc.Subgraph[13].Data;
-    SCFloatArrayRef RSI_HA_Low =sc.Subgraph[14].Data;
-    SCFloatArrayRef RSI_HA_Close =sc.Subgraph[15].Data;
-
-    // RSI calculation for Heikin-Ashi data
-    SCFloatArrayRef HA_Close=sc.Subgraph[6].Data;
-    SCFloatArrayRef HA_Open=sc.Subgraph[7].Data;
-    SCFloatArrayRef HA_High= sc.Subgraph[8].Data;
-    SCFloatArrayRef HA_Low= sc.Subgraph[9].Data;
-    HA_Open[sc.Index] = (sc.Open[sc.Index ] + sc.Close[sc.Index]) / 2.0f;
-    HA_Close[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
-    HA_High[sc.Index] = max(sc.High[sc.Index], max(HA_Open[sc.Index], HA_Close[sc.Index]));
-    HA_Low[sc.Index] = min(sc.Low[sc.Index], min(HA_Open[sc.Index], HA_Close[sc.Index]));
-
-    SCSubgraphRef RSI_Close=sc.Subgraph[16];
-    SCSubgraphRef RSI_Open=sc.Subgraph[17]; 
-    SCSubgraphRef RSI_High=sc.Subgraph[18]; 
-    SCSubgraphRef RSI_Low=sc.Subgraph[19];
-
-    sc.RSI(HA_Close, RSI_Close,sc.Index, LengthHARSI.GetFloat());
-    sc.RSI(HA_Open, RSI_Open,sc.Index, LengthHARSI.GetFloat());
-    sc.RSI(HA_High, RSI_High,sc.Index, LengthHARSI.GetFloat());
-    sc.RSI(HA_Low, RSI_Low,sc.Index, LengthHARSI.GetFloat());
-
-    float closeRSI = RSI_Close[sc.Index] - 50;
-    float openRSI = sc.Index > 0 ? RSI_Close[sc.Index - 1] - 50 : closeRSI;
-    float highRSI_raw = RSI_High[sc.Index] - 50;
-    float lowRSI_raw = RSI_Low[sc.Index] - 50;
-
-    float highRSI = max(highRSI_raw, lowRSI_raw);
-    float lowRSI = min(highRSI_raw, lowRSI_raw);
-
-    float HA_Close_Value = (openRSI + highRSI + lowRSI + closeRSI) / 4;
-
-    static float HA_Open_Value = 0;
-    if (sc.Index == 0)
-        HA_Open_Value = (openRSI + closeRSI) / 2;
-    else
-        HA_Open_Value = (HA_Open_Value * smothingget + HA_Close_Value) / (smothingget + 1);
-
-    float HA_High_Value = max(highRSI, max(HA_Open_Value, HA_Close_Value));
-    float HA_Low_Value = min(lowRSI, min(HA_Open_Value, HA_Close_Value));
-
-
-
+    float open=0.0f;
+    float high=0.0f; 
+    float low=0.0f ;
+    float close=0.0f;
+    
+    f_rsiHeikinAshi(LengthHARSI.GetFloat(), sc, &open, &high, &low, &close , smothingget);
     // Main zones
-    bool extreme_sell = HA_Close_Value > UpperOBExtreme.GetFloat();
-    bool frontier_sell = HA_Close_Value < UpperOBExtreme.GetFloat() && HA_Close_Value > UpperOB.GetFloat();
-    bool sea_zone = HA_Close_Value < UpperOB.GetFloat() && HA_Close_Value > LowerOS.GetFloat();
-    bool frontier_buy = HA_Close_Value < LowerOS.GetFloat() && HA_Close_Value > LowerOSExtreme.GetFloat();
-    bool extreme_buy = HA_Close_Value < LowerOSExtreme.GetFloat();
+    bool extreme_sell = close > UpperOBExtreme.GetFloat();
+    bool frontier_sell = close < UpperOBExtreme.GetFloat() && close > UpperOB.GetFloat();
+    bool sea_zone = close < UpperOB.GetFloat() && close > LowerOS.GetFloat();
+    bool frontier_buy = close < LowerOS.GetFloat() && close > LowerOSExtreme.GetFloat();
+    bool extreme_buy = close < LowerOSExtreme.GetFloat();
 
-    bool fr_buy_sweep = sea_zone && HA_High_Value > UpperOB.GetFloat();
-    bool fr_sel_sweep = sea_zone && HA_Low_Value < LowerOS.GetFloat();
-    bool extreme_sell_1 = HA_Close_Value > 27.5 && close <= 30;
-    bool extreme_sell_2 = HA_Close_Value > 25 && close <= 27.5;
-    bool extreme_sell_3 = HA_Close_Value > 22.5 && HA_Close_Value <= 25;
-    bool extreme_sell_4 = HA_Close_Value > 20 && HA_Close_Value <= 22.5;
-    bool extreme_buy_1 = HA_Close_Value < -27.5 && HA_Close_Value >= -30;
-    bool extreme_buy_2 = HA_Close_Value < -25 && HA_Close_Value >= -27.5;
-    bool extreme_buy_3 = HA_Close_Value < -22.5 && HA_Close_Value >= -25;
-    bool extreme_buy_4 = HA_Close_Value < -20 && HA_Close_Value >= -22.5;
+    bool fr_buy_sweep = sea_zone && high > UpperOB.GetFloat();
+    bool fr_sel_sweep = sea_zone && low < LowerOS.GetFloat();
+    bool extreme_sell_1 = close > 27.5 && close <= 30;
+    bool extreme_sell_2 = close > 25 && close <= 27.5;
+    bool extreme_sell_3 = close > 22.5 && close <= 25;
+    bool extreme_sell_4 = close > 20 && close <= 22.5;
+    bool extreme_buy_1 = close < -27.5 && close >= -30;
+    bool extreme_buy_2 = close < -25 && close >= -27.5;
+    bool extreme_buy_3 = close < -22.5 && close >= -25;
+    bool extreme_buy_4 = close < -20 && close >= -22.5;
     // Extra extreme zones
-    bool extra_extreme_sell = HA_Close_Value > 30;
-    bool extra_extreme_buy = HA_Close_Value < -30;
+    bool extra_extreme_sell = close > 30;
+    bool extra_extreme_buy = close < -30;
 
     COLORREF candle_color = RGB(128, 128, 128); // Default to gray
     if (extra_extreme_sell)
