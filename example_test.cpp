@@ -24,7 +24,7 @@ void PlotBars(SCStudyInterfaceRef sc, int index,  COLORREF color, SCSubgraphRef 
     sc.Subgraph[0][index] =ToolBody.BeginValue;  // Open
     sc.Subgraph[1][index] =ToolBody.EndValue; // Close
     sc.Subgraph[0].DataColor[index]=ToolBody.Color;
-    sc.Subgraph[1].DataColor[index]=ToolBody.Color;
+    sc.Subgraph[1].DataColor[index]=sc.BaseData[SC_LAST][sc.Index];
     sc.Subgraph[0].LineWidth=1;
     sc.Subgraph[1].LineWidth=1;
    
@@ -169,45 +169,36 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     float smothingget=Smoothing.GetFloat();
     float candleBarSize=BarSize.GetFloat();
 
-    // Subgraphs
-    SCFloatArrayRef RSI_HA_Open = sc.Subgraph[12].Data;
-    SCFloatArrayRef RSI_HA_High = sc.Subgraph[13].Data;
-    SCFloatArrayRef RSI_HA_Low =sc.Subgraph[14].Data;
-    SCFloatArrayRef RSI_HA_Close =sc.Subgraph[15].Data;
-
     // RSI calculation for Heikin-Ashi data
     SCFloatArrayRef HA_Close=sc.Subgraph[6].Data;
     SCFloatArrayRef HA_Open=sc.Subgraph[7].Data;
     SCFloatArrayRef HA_High= sc.Subgraph[8].Data;
     SCFloatArrayRef HA_Low= sc.Subgraph[9].Data;
-    HA_Open[sc.Index] = (sc.Open[sc.Index] + sc.Close[sc.Index]) / 2.0f;
+    HA_Open[sc.Index] = (sc.Open[sc.Index-1] + sc.Close[sc.Index-1]) / 2.0f;
     HA_Close[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
     HA_High[sc.Index] = max(sc.High[sc.Index], max(HA_Open[sc.Index], HA_Close[sc.Index]));
     HA_Low[sc.Index] = min(sc.Low[sc.Index], min(HA_Open[sc.Index], HA_Close[sc.Index]));
- 
 
     SCSubgraphRef RSI_Close=sc.Subgraph[16];
     SCSubgraphRef RSI_Open=sc.Subgraph[17]; 
     SCSubgraphRef RSI_High=sc.Subgraph[18]; 
     SCSubgraphRef RSI_Low=sc.Subgraph[19];
+   
+    sc.RSI(HA_Close, RSI_Close,sc.Index, LengthHARSI.GetFloat());
+    sc.RSI(HA_Open, RSI_Open,sc.Index, LengthHARSI.GetFloat());
+    sc.RSI(HA_High, RSI_High,sc.Index,LengthHARSI.GetFloat());
+    sc.RSI(HA_Low, RSI_Low,sc.Index, LengthHARSI.GetFloat());
 
-    sc.RSI(HA_Close, RSI_Close,sc.Index,MOVAVGTYPE_SIMPLE, LengthHARSI.GetFloat());
-    sc.RSI(HA_Open, RSI_Open,sc.Index, MOVAVGTYPE_SIMPLE,LengthHARSI.GetFloat());
-    sc.RSI(HA_High, RSI_High,sc.Index, MOVAVGTYPE_SIMPLE,LengthHARSI.GetFloat());
-    sc.RSI(HA_Low, RSI_Low,sc.Index,MOVAVGTYPE_SIMPLE, LengthHARSI.GetFloat());
-
-    float closeRSI = RSI_Close[sc.Index] - 50;
-    float openRSI = sc.Index > 0 ? RSI_Close[sc.Index - 1] - 50 : closeRSI;
-    float highRSI_raw = RSI_High[sc.Index] - 50;
-    float lowRSI_raw = RSI_Low[sc.Index] - 50;
+    float closeRSI = RSI_Close[sc.Index] - 50.0f;
+    float openRSI = sc.Index > 0 ? RSI_Close[sc.Index - 1] - 50.0f : closeRSI;
+    float highRSI_raw = RSI_High[sc.Index] - 50.0f;
+    float lowRSI_raw = RSI_Low[sc.Index] - 50.0f;
 
     float highRSI = max(highRSI_raw, lowRSI_raw);
     float lowRSI = min(highRSI_raw, lowRSI_raw);
 
-    float HA_Close_Value = (openRSI + highRSI + lowRSI + closeRSI) / 4;
+    float HA_Close_Value = (openRSI + highRSI + lowRSI + closeRSI) / 4.0f;
 
-    message.Format("sc.BaseData[SC_OPEN][sc.Index];------->: %.5f", sc.BaseData[SC_OPEN][sc.Index]);
-	sc.AddMessageToLog(message, 1);
     message.Format("closeRSI------->: %.5f", closeRSI);
 	sc.AddMessageToLog(message, 1);
 	message.Format("openRSI : %.5f", openRSI );
