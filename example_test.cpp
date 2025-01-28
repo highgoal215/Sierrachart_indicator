@@ -1,15 +1,13 @@
 #include "sierrachart.h"
 SCDLLName("Edge Zone")
 
+
 // Function to calculate Simple Moving Average (SMA)
 float CalculateSMA(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, int length) {
     float sum = 0.0f;
-    for (int i = 0; i < length-1; ++i) {
-        sum += source[index - i];
+    for (int index = 0; index < length-1; ++index) {
+        sum += source[index];
     }
-    SCString message;
-      message.Format(" sum / length------->: %.5f",  sum / length);
-	sc.AddMessageToLog(message, 1);
     return sum / length;
 }
 
@@ -18,7 +16,8 @@ float CalculateRMA(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, fl
     float alpha = 1.0f / length;
     float rma = 0.0f;
 
-    if (index < length) {
+
+        if (index < length) {
         // Use SMA for the initial value
         rma = CalculateSMA(sc, source, index, length);
     } else {
@@ -28,76 +27,41 @@ float CalculateRMA(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, fl
     // Store the current RMA for the next calculation
     sc.SetPersistentFloat(1, rma);
     return rma;
-}
-float CalculateCustomRSI(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, float length) {
-    SCFloatArrayRef upwardChange = sc.Subgraph[12].Data;
-    SCFloatArrayRef downwardChange = sc.Subgraph[13].Data;
- SCString message;
-   if (index > 0) {
-        upwardChange[index] = max(source[index] - source[index - 1], 0.0f); // Upward change
-        downwardChange[index] = max(source[index - 1] - source[index], 0.0f); // Downward change
-    }
-    // message.Format("upwardChange[sc.Index]------->: %.5f", upwardChange[index]);
-	// sc.AddMessageToLog(message, 1);
-    // message.Format(" downwardChange[sc.Index]------->: %.5f",  downwardChange[index]);
-	// sc.AddMessageToLog(message, 1);
-    // Calculate RMA of upward and downward changes
-    float rmaUp = CalculateRMA(sc,upwardChange, index, length);
-    float rmaDown = CalculateRMA(sc, downwardChange,index, length );
-    message.Format("rmaUp------->: %.5f", rmaUp);
-	sc.AddMessageToLog(message, 1);
-    message.Format(" rmaDown------->: %.5f",  rmaDown);
-	sc.AddMessageToLog(message, 1);
 
-    // Avoid division by zero
+}
+
+
+// Function to calculate RSI
+float CalculateRSI(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, float length) {
+    SCFloatArrayRef upwardChange = sc.Subgraph[15].Data;
+    SCFloatArrayRef downwardChange = sc.Subgraph[16].Data;
+    SCString message;
+
+    message.Format(": %.5f",index);
+    sc.AddMessageToLog(message, 1);
+        upwardChange[index] = max(source[index] - source[index -1], 0.0f); // Upward change
+        downwardChange[index] = max(source[index -1] - source[index], 0.0f); // Downward change
+    message.Format("source[index]: %.5f", source[index]);
+    sc.AddMessageToLog(message, 1);
+    message.Format("source[index - 1]: %.5f", source[index -1]);
+    sc.AddMessageToLog(message, 1);
+ 
+    float rmaUp = CalculateRMA(sc, upwardChange, index, length);
+    float rmaDown = CalculateRMA(sc, downwardChange, index, length);
+    message.Format("rmaUp: %.5f", rmaUp);
+    sc.AddMessageToLog(message, 1);
+    message.Format("rmaDown: %.5f", rmaDown);
+    sc.AddMessageToLog(message, 1);
     if (rmaDown == 0.0f) {
         return 100.0f;
     }
 
-    // Calculate RSI
     float rs = rmaUp / rmaDown;
-    message.Format("rs------->: %.5f",  rs);
-	sc.AddMessageToLog(message, 1);
     float rsi = 100.0f - (100.0f / (1.0f + rs));
-    message.Format("rsi------->: %.5f",  rsi);
-	sc.AddMessageToLog(message, 1);
-    return rsi;
-}
-// // Function to calculate Heikin Ashi RSI
-// void f_rsiHeikinAshi(float length, SCStudyInterfaceRef sc, float* open, float* high, float* low, float* close, float smothingget, int index)
-// {
-//     SCString message;
-//     SCFloatArrayRef haOpen = sc.Subgraph[6].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
-//     SCFloatArrayRef haHigh = sc.Subgraph[7].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
-//     SCFloatArrayRef haLow = sc.Subgraph[8].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
-//     SCFloatArrayRef haClose = sc.Subgraph[9].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
-//     haOpen[sc.Index] = (sc.Open[sc.Index ] + sc.Close[sc.Index]) / 2.0f;
-//     haClose[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
-//     haHigh[sc.Index] = max(sc.High[sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
-//     haLow[sc.Index] = min(sc.Low[sc.Index], min(haOpen[sc.Index], haClose[sc.Index]));
-//     float closeRSI = CalculateCustomRSI(sc, haClose, index, length );
-//     float openRSI = closeRSI;
-//     float highRSI_raw = CalculateCustomRSI(sc, haHigh, index, length );
-//     float lowRSI_raw = CalculateCustomRSI(sc, haLow, index, length );
-//     // float closeRSI = f_zrsi(haClose, length, sc);
-//     // float highRSI_raw = f_zrsi(haHigh, length, sc);
-//     // float lowRSI_raw = f_zrsi(haLow, length, sc);
-//     float highRSI = max(highRSI_raw, lowRSI_raw);
-//     float lowRSI = min(highRSI_raw, lowRSI_raw);
-//     *close = (openRSI + highRSI + lowRSI + closeRSI) / 4.0f;
-// 	sc.AddMessageToLog(message, 1);
-//     if (sc.Index == 0)
-//         {
-//             *open = (openRSI + closeRSI) / 2.0f;
-//         }
-//         else
-//         {
-//             *open = ((*open) * smothingget+ (*close)) / (smothingget + 1);
-//         }
-//     *high = max(highRSI, max((*open), (*close)));
-//     *low = min(lowRSI, min((*open), (*close)));
+    return rsi-50;
 
-// }
+}
+
 void PlotBars(SCStudyInterfaceRef sc, int index,  COLORREF color, SCSubgraphRef subgraph0, SCSubgraphRef subgraph1, float &barwidth)
 {
     float CustomOpen =sc.Open[index];
@@ -140,8 +104,8 @@ void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef s
         ToolWick.Region = 1; // Draw in the subgraph region
         ToolWick.BeginDateTime = sc.BaseDateTimeIn[index]; 
         ToolWick.EndDateTime = sc.BaseDateTimeIn[index];  
-        ToolWick.BeginValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])? CustomLow :CustomHigh;    
-        ToolWick.EndValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])?  CustomHigh :CustomLow ;      
+        ToolWick.BeginValue =  min(sc.High[sc.Index], min(sc.Open[sc.Index], sc.Close[sc.Index]));  
+        ToolWick.EndValue =max(sc.High[sc.Index], max(sc.Open[sc.Index], sc.Close[sc.Index]));       
         ToolWick.DrawingType = DRAWING_LINE;
         ToolWick.AddMethod = UTAM_ADD_OR_ADJUST;
         sc.UseTool(ToolWick);
@@ -156,7 +120,6 @@ void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef s
 SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
 {
     // Define input parameters
-    SCString message;
     SCInputRef LengthHARSI = sc.Input[0];
     SCInputRef Smoothing = sc.Input[1];
     SCInputRef Source = sc.Input[2];
@@ -263,6 +226,7 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     float high=0.0f; 
     float low=0.0f ;
     float close=0.0f;
+    
     SCFloatArrayRef haOpen = sc.Subgraph[6].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
     SCFloatArrayRef haHigh = sc.Subgraph[7].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
     SCFloatArrayRef haLow = sc.Subgraph[8].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
@@ -271,17 +235,15 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     haClose[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
     haHigh[sc.Index] = max(sc.High[sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
     haLow[sc.Index] = min(sc.Low[sc.Index], min(haOpen[sc.Index], haClose[sc.Index]));
-    float closeRSI = CalculateCustomRSI(sc, haClose, index, LengthHARSI.GetFloat() );
-    float openRSI = closeRSI;
-    float highRSI_raw = CalculateCustomRSI(sc, haHigh, index, LengthHARSI.GetFloat() );
-    float lowRSI_raw = CalculateCustomRSI(sc, haLow, index, LengthHARSI.GetFloat() );
-    // float closeRSI = f_zrsi(haClose, length, sc);
-    // float highRSI_raw = f_zrsi(haHigh, length, sc);
-    // float lowRSI_raw = f_zrsi(haLow, length, sc);
+      // Calculate RSI
+    float closeRSI = CalculateRSI(sc, haClose, sc.Index, LengthRSI.GetFloat());
+    float openRSI = sc.Index > 0 ? CalculateRSI(sc, haOpen, sc.Index, LengthRSI.GetFloat()): closeRSI;
+    float highRSI_raw = CalculateRSI(sc, haHigh, sc.Index, LengthRSI.GetFloat());
+    float lowRSI_raw = CalculateRSI(sc, haLow, sc.Index, LengthRSI.GetFloat());
     float highRSI = max(highRSI_raw, lowRSI_raw);
     float lowRSI = min(highRSI_raw, lowRSI_raw);
     close = (openRSI + highRSI + lowRSI + closeRSI) / 4.0f;
-	sc.AddMessageToLog(message, 1);
+
     if (sc.Index == 0)
         {
             open = (openRSI + closeRSI) / 2.0f;
@@ -292,7 +254,14 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
         }
     high = max(highRSI, max(open, close));
     low = min(lowRSI, min(open, close));
-    // f_rsiHeikinAshi(LengthHARSI.GetFloat(), sc, &open, &high, &low, &close , smothingget, index);
+     SCString message;
+    message.Format("close: %.5f", close);
+    sc.AddMessageToLog(message, 1);
+    message.Format("high: %.5f", high);
+    sc.AddMessageToLog(message, 1);
+    message.Format("low: %.5f", low);
+    sc.AddMessageToLog(message, 1);
+
     // Main zones
     bool extreme_sell = close > UpperOBExtreme.GetFloat();
     bool frontier_sell = close < UpperOBExtreme.GetFloat() && close > UpperOB.GetFloat();

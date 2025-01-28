@@ -85,8 +85,8 @@ void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef s
         ToolWick.Region = 1; // Draw in the subgraph region
         ToolWick.BeginDateTime = sc.BaseDateTimeIn[index]; 
         ToolWick.EndDateTime = sc.BaseDateTimeIn[index];  
-        ToolWick.BeginValue =  min(sc.High[sc.Index], min(sc.Open[sc.Index], sc.Close[sc.Index]));  
-        ToolWick.EndValue =max(sc.High[sc.Index], max(sc.Open[sc.Index], sc.Close[sc.Index]));      
+        ToolWick.BeginValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])? CustomLow :CustomHigh;    
+        ToolWick.EndValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])?  CustomHigh :CustomLow ;      
         ToolWick.DrawingType = DRAWING_LINE;
         ToolWick.AddMethod = UTAM_ADD_OR_ADJUST;
         sc.UseTool(ToolWick);
