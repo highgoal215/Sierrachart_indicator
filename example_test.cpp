@@ -3,7 +3,7 @@ SCDLLName("Edge Zone")
 
 
 // Function to calculate Simple Moving Average (SMA)
-float CalculateSMA(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, int length) {
+float CalculateSMA(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, float length) {
     float sum = 0.0f;
     for (int index = 0; index < length-1; ++index) {
         sum += source[index];
@@ -33,8 +33,8 @@ float CalculateRMA(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, fl
 
 // Function to calculate RSI
 float CalculateRSI(SCStudyInterfaceRef sc, SCFloatArrayRef source, int index, float length) {
-    SCFloatArrayRef upwardChange = sc.Subgraph[15].Data;
-    SCFloatArrayRef downwardChange = sc.Subgraph[16].Data;
+    SCFloatArrayRef upwardChange = sc.Subgraph[8].Data;
+    SCFloatArrayRef downwardChange = sc.Subgraph[9].Data;
     SCString message;
 
     message.Format(": %.5f",index);
@@ -208,14 +208,14 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
             sc.Subgraph[2].DrawStyle = DRAWSTYLE_HIDDEN;
             sc.Subgraph[3].Name = "Low";
             sc.Subgraph[3].DrawStyle = DRAWSTYLE_HIDDEN;
-            sc.Subgraph[10].Name="UpperExtremline";
-            sc.Subgraph[10].DrawStyle=DRAWSTYLE_DASH;
-            sc.Subgraph[11].Name="Uppeline";
-            sc.Subgraph[11].DrawStyle=DRAWSTYLE_DASH;
-            sc.Subgraph[12].Name="Lowline";
-            sc.Subgraph[12].DrawStyle=DRAWSTYLE_DASH;
-            sc.Subgraph[13].Name="LowExtremline";
-            sc.Subgraph[13].DrawStyle=DRAWSTYLE_DASH;
+            sc.Subgraph[4].Name="UpperExtremline";
+            sc.Subgraph[4].DrawStyle=DRAWSTYLE_DASH;
+            sc.Subgraph[5].Name="Uppeline";
+            sc.Subgraph[5].DrawStyle=DRAWSTYLE_DASH;
+            sc.Subgraph[6].Name="Lowline";
+            sc.Subgraph[6].DrawStyle=DRAWSTYLE_DASH;
+            sc.Subgraph[7].Name="LowExtremline";
+            sc.Subgraph[7].DrawStyle=DRAWSTYLE_DASH;
 
             return;
         }
@@ -227,10 +227,11 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     float low=0.0f ;
     float close=0.0f;
     
-    SCFloatArrayRef haOpen = sc.Subgraph[6].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
-    SCFloatArrayRef haHigh = sc.Subgraph[7].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
-    SCFloatArrayRef haLow = sc.Subgraph[8].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
-    SCFloatArrayRef haClose = sc.Subgraph[9].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
+     SCString message;
+    SCFloatArrayRef haOpen = sc.Subgraph[10].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
+    SCFloatArrayRef haHigh = sc.Subgraph[11].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
+    SCFloatArrayRef haLow = sc.Subgraph[12].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
+    SCFloatArrayRef haClose = sc.Subgraph[13].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
     haOpen[sc.Index] = (sc.Open[sc.Index ] + sc.Close[sc.Index]) / 2.0f;
     haClose[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
     haHigh[sc.Index] = max(sc.High[sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
@@ -243,7 +244,13 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     float highRSI = max(highRSI_raw, lowRSI_raw);
     float lowRSI = min(highRSI_raw, lowRSI_raw);
     close = (openRSI + highRSI + lowRSI + closeRSI) / 4.0f;
-
+     message.Format("closeRSI: %.5f", closeRSI);
+	sc.AddMessageToLog(message, 1);
+    message.Format("highRSI_raw: %.5f", highRSI_raw);
+	sc.AddMessageToLog(message, 1);
+    message.Format("lowRSI_raw: %.5f", lowRSI_raw);
+	sc.AddMessageToLog(message, 1);
+	sc.AddMessageToLog(message, 1);
     if (sc.Index == 0)
         {
             open = (openRSI + closeRSI) / 2.0f;
@@ -254,7 +261,6 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
         }
     high = max(highRSI, max(open, close));
     low = min(lowRSI, min(open, close));
-     SCString message;
     message.Format("close: %.5f", close);
     sc.AddMessageToLog(message, 1);
     message.Format("high: %.5f", high);
@@ -330,8 +336,8 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     // ToolUpperExtreme.TransparencyLevel = 50;
     // ToolUpperExtreme.Text = "Upper Extreme";
     // ToolUpperExtreme.Region=1;
-    // sc.Subgraph[10][sc.Index]=ToolUpperExtreme.BeginValue;
-    // sc.Subgraph[10].DataColor[sc.Index]=ToolUpperExtreme.Color;
+    // sc.Subgraph[4][sc.Index]=ToolUpperExtreme.BeginValue;
+    // sc.Subgraph[4].DataColor[sc.Index]=ToolUpperExtreme.Color;
     // sc.UseTool(ToolUpperExtreme);
 
     // // Upper
@@ -346,8 +352,8 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     // ToolUpper.TransparencyLevel = 70;
     // ToolUpper.Text = "Upper";
     // ToolUpper.Region=1;
-    // sc.Subgraph[11][sc.Index]=ToolUpper.BeginValue;
-    // sc.Subgraph[11].DataColor[sc.Index]=ToolUpper.Color;
+    // sc.Subgraph[5][sc.Index]=ToolUpper.BeginValue;
+    // sc.Subgraph[5].DataColor[sc.Index]=ToolUpper.Color;
     // sc.UseTool(ToolUpper);
 
     // // Lower
@@ -362,8 +368,8 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     // ToolLower.TransparencyLevel = 70;
     // ToolLower.Text = "Lower";
     // ToolLower.Region=1;
-    // sc.Subgraph[12][sc.Index]=ToolLower.BeginValue;
-    // sc.Subgraph[12].DataColor[sc.Index]=ToolLower.Color;
+    // sc.Subgraph[6][sc.Index]=ToolLower.BeginValue;
+    // sc.Subgraph[6].DataColor[sc.Index]=ToolLower.Color;
     // sc.UseTool(ToolLower);
 
     // // Lower Extreme
@@ -378,8 +384,8 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     // ToolLowerExtreme.TransparencyLevel = 50;
     // ToolLowerExtreme.Text = "Lower Extreme";
     // ToolLowerExtreme.Region=1;
-    // sc.Subgraph[13][sc.Index]=ToolLowerExtreme.BeginValue;
-    // sc.Subgraph[13].DataColor[sc.Index]=ToolLowerExtreme.Color;
+    // sc.Subgraph[7][sc.Index]=ToolLowerExtreme.BeginValue;
+    // sc.Subgraph[7].DataColor[sc.Index]=ToolLowerExtreme.Color;
     // sc.UseTool(ToolLowerExtreme);
 
 }

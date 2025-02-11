@@ -1,106 +1,11 @@
 #include "sierrachart.h"
-SCDLLName("Edge Zone")
 
-float f_zrsi(SCFloatArrayRef source, float length, SCStudyInterfaceRef sc)
-{   
-    SCString message;
-    SCSubgraphRef RSIArray = sc.Subgraph[5]; // Assuming Subgraph[5] is used for RSI values
-    static float RSivalue=0;
-    sc.RSI(source, RSIArray, sc.Index, length);
-    RSivalue=RSIArray[sc.Index]-50;
-    return RSivalue;
+SCDLLName("Heikin Ashi RSI with Smoothing")
 
-}
-// Function to calculate Heikin Ashi RSI
-void f_rsiHeikinAshi(float length, SCStudyInterfaceRef sc, float* open, float* high, float* low, float* close, float smothingget)
+SCSFExport scsf_HeikinAshiRSI(SCStudyInterfaceRef sc)
 {
-    SCString message;
-    SCFloatArrayRef haOpen = sc.Subgraph[6].Data; // Assuming Subgraph[6] is used for Heikin Ashi open values
-    SCFloatArrayRef haHigh = sc.Subgraph[7].Data; // Assuming Subgraph[7] is used for Heikin Ashi high values
-    SCFloatArrayRef haLow = sc.Subgraph[8].Data; // Assuming Subgraph[8] is used for Heikin Ashi low values
-    SCFloatArrayRef haClose = sc.Subgraph[9].Data; // Assuming Subgraph[9] is used for Heikin Ashi close values
-    haOpen[sc.Index] = (sc.Open[sc.Index ] + sc.Close[sc.Index]) / 2.0f;
-    haClose[sc.Index] = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0f;
-    haHigh[sc.Index] = max(sc.High[sc.Index], max(haOpen[sc.Index], haClose[sc.Index]));
-    haLow[sc.Index] = min(sc.Low[sc.Index], min(haOpen[sc.Index], haClose[sc.Index]));
-    float closeRSI = f_zrsi(haClose, length, sc);
-    float openRSI = closeRSI;
-    float highRSI_raw = f_zrsi(haHigh, length, sc);
-    float lowRSI_raw = f_zrsi(haLow, length, sc);
-    float highRSI = max(highRSI_raw, lowRSI_raw);
-    float lowRSI = min(highRSI_raw, lowRSI_raw);
-    *close = (openRSI + highRSI + lowRSI + closeRSI) / 4.0f;
-	sc.AddMessageToLog(message, 1);
-    if (sc.Index == 0)
-        {
-            *open = (openRSI + closeRSI) / 2.0f;
-        }
-        else
-        {
-            *open = ((*open) * smothingget+ (*close)) / (smothingget + 1);
-        }
-    *high = max(highRSI, max((*open), (*close)));
-    *low = min(lowRSI, min((*open), (*close)));
-
-}
-void PlotBars(SCStudyInterfaceRef sc, int index,  COLORREF color, SCSubgraphRef subgraph0, SCSubgraphRef subgraph1, float &barwidth)
-{
-    float CustomOpen =sc.Open[index];
-    float CustomClose =sc.Close[index];
-    s_UseTool ToolBody;
-    ToolBody.Clear();
-    // Create a shape tool
-    ToolBody.ChartNumber = sc.ChartNumber;
-    ToolBody.Color = color;
-    ToolBody.LineWidth=barwidth;
-    ToolBody.Region = 1; // Draw in the subgraph region
-    ToolBody.BeginDateTime = sc.BaseDateTimeIn[index] ; 
-    ToolBody.EndDateTime = sc.BaseDateTimeIn[index];  
-    ToolBody.BeginValue = CustomOpen; 
-    ToolBody.EndValue = CustomClose;    
-    ToolBody.DrawingType=DRAWING_RECTANGLEHIGHLIGHT;
-    ToolBody.AddMethod = UTAM_ADD_OR_ADJUST;
-    sc.UseTool(ToolBody);
-    sc.Subgraph[0][index] =ToolBody.BeginValue;  // Open
-    sc.Subgraph[1][index] =ToolBody.EndValue; // Close
-    sc.Subgraph[0].DataColor[index]=ToolBody.Color;
-    sc.Subgraph[1].DataColor[index]=ToolBody.Color;
-    sc.Subgraph[0].LineWidth=1;
-    sc.Subgraph[1].LineWidth=1;
-   
-}
-
-void PlotLine(SCStudyInterfaceRef sc, int index, COLORREF color, SCSubgraphRef subgraph3, SCSubgraphRef subgraph2)
-{
-
-    {
-        // Create a shape tool
-        float CustomHigh = sc.High[index];
-        float CustomLow =sc.Low[index];
-        s_UseTool ToolWick;
-        ToolWick.Clear();
-        ToolWick.ChartNumber = sc.ChartNumber;
-        ToolWick.Color = color;
-        ToolWick.LineWidth=1;
-        ToolWick.Region = 1; // Draw in the subgraph region
-        ToolWick.BeginDateTime = sc.BaseDateTimeIn[index]; 
-        ToolWick.EndDateTime = sc.BaseDateTimeIn[index];  
-        ToolWick.BeginValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])? CustomLow :CustomHigh;    
-        ToolWick.EndValue =(sc.BaseData[SC_LAST][index] >sc.BaseData[SC_OPEN][index])?  CustomHigh :CustomLow ;      
-        ToolWick.DrawingType = DRAWING_LINE;
-        ToolWick.AddMethod = UTAM_ADD_OR_ADJUST;
-        sc.UseTool(ToolWick);
-        sc.Subgraph[2][index] = ToolWick.BeginValue;  // Open
-        sc.Subgraph[3][index] =ToolWick.EndValue; // Close
-        sc.Subgraph[2].DataColor[index]=ToolWick.Color;
-        sc.Subgraph[3].DataColor[index]=ToolWick.Color;
-        sc.Subgraph[3].LineWidth=1;
-        sc.Subgraph[3].LineWidth=1;
-    }
-}
-SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
-{
-    // Define input parameters
+    
+        // Define input parameters
     SCInputRef LengthHARSI = sc.Input[0];
     SCInputRef Smoothing = sc.Input[1];
     SCInputRef Source = sc.Input[2];
@@ -130,11 +35,17 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
     COLORREF extreme_buy_4_color=RGB(255,255,255);
     COLORREF frontier_sell_color=RGB(33,150,243);
     COLORREF frontier_buy_color=RGB(76,175,80);
+    float open_rsi;
+    float high_rsi; 
+    float low_rsi ;
+    float close_rsi;
+    if (sc.SetDefaults) {
+        sc.GraphName = "Heikin Ashi RSI with Smoothing";
+        sc.StudyDescription = "Heikin Ashi RSI with Open Smoothing";
+        sc.GraphRegion = 0;
+        sc.AutoLoop = 1;
 
-    if (sc.SetDefaults)
-        {
-        
-            sc.GraphName = "Edge Zone";
+       sc.GraphName = "Edge Zone";
             sc.StudyDescription = "Edge Zone";
             sc.AutoLoop = 1;
 
@@ -180,35 +91,134 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
             BarSize.SetFloat(6);
             BarSize.SetFloatLimits(1,INT_MAX);
 
-            // // Configure the subgraphs for open and close lines
-            sc.Subgraph[0].Name = "Open";
-            sc.Subgraph[0].DrawStyle = DRAWSTYLE_HIDDEN;
-            sc.Subgraph[1].Name = "Close";
-            sc.Subgraph[1].DrawStyle = DRAWSTYLE_HIDDEN;
-            sc.Subgraph[2].Name = "High";
-            sc.Subgraph[2].DrawStyle = DRAWSTYLE_HIDDEN;
-            sc.Subgraph[3].Name = "Low";
-            sc.Subgraph[3].DrawStyle = DRAWSTYLE_HIDDEN;
-            sc.Subgraph[10].Name="UpperExtremline";
-            sc.Subgraph[10].DrawStyle=DRAWSTYLE_DASH;
-            sc.Subgraph[11].Name="Uppeline";
-            sc.Subgraph[11].DrawStyle=DRAWSTYLE_DASH;
-            sc.Subgraph[12].Name="Lowline";
-            sc.Subgraph[12].DrawStyle=DRAWSTYLE_DASH;
-            sc.Subgraph[13].Name="LowExtremline";
-            sc.Subgraph[13].DrawStyle=DRAWSTYLE_DASH;
+        // sc.Subgraph[0].Name = "HA RSI Open";
+        // sc.Subgraph[0].DrawStyle = DRAWSTYLE_BAR;
+        // sc.Subgraph[0].PrimaryColor = RGB(0, 255, 0);
+        sc.Subgraph[5].Name = "Volume";
+        sc.Subgraph[5].DrawStyle = DRAWSTYLE_BAR;
 
-            return;
+
+        // sc.Subgraph[1].Name = "HA RSI High";
+        // sc.Subgraph[1].DrawStyle = DRAWSTYLE_BAR;
+        // sc.Subgraph[1].PrimaryColor = RGB(255, 0, 0);
+
+        // sc.Subgraph[2].Name = "HA RSI Low";
+        // sc.Subgraph[2].DrawStyle = DRAWSTYLE_BAR;
+        // sc.Subgraph[2].PrimaryColor = RGB(0, 0, 255);
+
+        // sc.Subgraph[3].Name = "HA RSI Close";
+        // sc.Subgraph[3].DrawStyle = DRAWSTYLE_BAR;
+        // sc.Subgraph[3].PrimaryColor = RGB(255, 255, 0);
+
+        return;
+    }
+
+    // Persistent arrays for Heikin Ashi calculations
+    SCFloatArrayRef ha_open = sc.Subgraph[4];
+    SCFloatArrayRef ha_high =  sc.Subgraph[5];
+    SCFloatArrayRef ha_low = sc.Subgraph[6];
+    SCFloatArrayRef ha_close = sc.Subgraph[7];
+
+    // Persistent arrays for RSI calculations
+    SCFloatArrayRef avg_gain = sc.Subgraph[8];
+    SCFloatArrayRef avg_loss = sc.Subgraph[9];
+
+    // Persistent arrays for smoothed values
+    SCFloatArrayRef smoothed_open = sc.Subgraph[10];
+
+    int index = sc.Index;
+    int length = LengthHARSI.GetInt();
+    int smoothing = Smoothing.GetInt();
+
+    // Calculate Heikin Ashi values
+    if (index == 0) {
+        ha_open[index] = (sc.Open[index] + sc.Close[index]) / 2.0f;
+        ha_high[index] = sc.High[index];
+        ha_low[index] = sc.Low[index];
+        ha_close[index] = (sc.Open[index] + sc.High[index] + sc.Low[index] + sc.Close[index]) / 4.0f;
+    } else {
+        ha_open[index] = (ha_open[index - 1] + ha_close[index - 1]) / 2.0f;
+        ha_high[index] = fmax(sc.High[index], fmax(ha_open[index], ha_close[index]));
+        ha_low[index] = fmin(sc.Low[index], fmin(ha_open[index], ha_close[index]));
+        ha_close[index] = (sc.Open[index] + sc.High[index] + sc.Low[index] + sc.Close[index]) / 4.0f;
+    }
+
+    // Calculate RSI components
+    if (index < 1) {
+        avg_gain[index] = 0;
+        avg_loss[index] = 0;
+        smoothed_open[index] = 0;
+        sc.Subgraph[0][index] = 0;
+        sc.Subgraph[1][index] = 0;
+        sc.Subgraph[2][index] = 0;
+        sc.Subgraph[3][index] = 0;
+        return;
+    }
+
+    float change = ha_close[index] - ha_close[index - 1];
+    float gain = change > 0 ? change : 0;
+    float loss = change < 0 ? -change : 0;
+
+    if (index < length) {
+        // Accumulation phase
+        avg_gain[index] = avg_gain[index - 1] + gain;
+        avg_loss[index] = avg_loss[index - 1] + loss;
+        smoothed_open[index] = 0;
+        sc.Subgraph[0][index] = 0;
+        sc.Subgraph[1][index] = 0;
+        sc.Subgraph[2][index] = 0;
+        sc.Subgraph[3][index] = 0;
+    } else if (index == length) {
+        // Initial average calculation
+        avg_gain[index] = (avg_gain[index - 1] + gain) / length;
+        avg_loss[index] = (avg_loss[index - 1] + loss) / length;
+
+        float rs = avg_loss[index] != 0 ? avg_gain[index] / avg_loss[index] : 0;
+        float rsi = 100.0f - (100.0f / (1.0f + rs));
+        float zrsi = rsi - 50.0f;
+
+        smoothed_open[index] = zrsi;
+        sc.Subgraph[0][index] = smoothed_open[index];
+        sc.Subgraph[1][index] = zrsi;
+        sc.Subgraph[2][index] = zrsi;
+        sc.Subgraph[3][index] = zrsi;
+    } else {
+        // Smoothing with Wilder's method
+        avg_gain[index] = (avg_gain[index - 1] * (length - 1) + gain) / length;
+        avg_loss[index] = (avg_loss[index - 1] * (length - 1) + loss) / length;
+
+        float rs = avg_loss[index] != 0 ? avg_gain[index] / avg_loss[index] : 0;
+        float rsi = 100.0f - (100.0f / (1.0f + rs));
+        float zrsi = rsi - 50.0f;
+
+        // Calculate smoothed open
+        if (index < smoothing) {
+            smoothed_open[index] = (smoothed_open[index - 1] + zrsi) / 2.0f;
+        } else {
+            smoothed_open[index] = (smoothed_open[index - 1] * smoothing + zrsi) / (smoothing + 1);
         }
 
-    float smothingget=Smoothing.GetFloat();
-    float candleBarSize=BarSize.GetFloat();
-    float open=0.0f;
-    float high=0.0f; 
-    float low=0.0f ;
-    float close=0.0f;
+        // Calculate Heikin Ashi RSI values
+         open_rsi = smoothed_open[index];
+         high_rsi = fmax(zrsi, fmax(open_rsi, zrsi));
+         low_rsi = fmin(zrsi, fmin(open_rsi, zrsi));
+         close_rsi = (open_rsi + high_rsi + low_rsi + zrsi) / 4.0f;
+        SCString message;
+        message.Format("closeRSI: %.5f", close_rsi);
+        sc.AddMessageToLog(message, 1);
+
+        sc.Subgraph[0][index] = open_rsi;
+        sc.Subgraph[1][index] = high_rsi;
+        sc.Subgraph[2][index] = low_rsi;
+        sc.Subgraph[3][index] = close_rsi;
+    }
+
+    return;
+    float open=open_rsi;
+    float high=high_rsi; 
+    float low=low_rsi ;
+    float close=close_rsi;
     
-    f_rsiHeikinAshi(LengthHARSI.GetFloat(), sc, &open, &high, &low, &close , smothingget);
     // Main zones
     bool extreme_sell = close > UpperOBExtreme.GetFloat();
     bool frontier_sell = close < UpperOBExtreme.GetFloat() && close > UpperOB.GetFloat();
@@ -261,72 +271,8 @@ SCSFExport scsf_NetVolumeCalculation(SCStudyInterfaceRef sc)
         candle_color=frontier_buy_color;
     else  (sc.Close[sc.Index]>sc.Open[sc.Index]) ?
     candle_color=sea_zone_upbar_color: candle_color=sea_zone_downbar_color;
-
-    PlotBars(sc, sc.Index, candle_color, sc.Subgraph[0],sc.Subgraph[1], candleBarSize);
-    PlotLine(sc, sc.Index, candle_color, sc.Subgraph[2],sc.Subgraph[3] );
-    
-    // //Upper Extreme
-    // s_UseTool ToolUpperExtreme;
-    // ToolUpperExtreme.Clear();
-    // ToolUpperExtreme.ChartNumber = sc.ChartNumber;
-    // ToolUpperExtreme.DrawingType = DRAWING_LINE;
-    // ToolUpperExtreme.AddMethod = UTAM_ADD_OR_ADJUST;
-    // ToolUpperExtreme.BeginValue = UpperOBExtreme.GetFloat();;
-    // ToolUpperExtreme.Color = RGB(0, 0, 255); // Blue
-    // ToolUpperExtreme.LineWidth = 2;
-    // ToolUpperExtreme.TransparencyLevel = 50;
-    // ToolUpperExtreme.Text = "Upper Extreme";
-    // ToolUpperExtreme.Region=1;
-    // sc.Subgraph[10][sc.Index]=ToolUpperExtreme.BeginValue;
-    // sc.Subgraph[10].DataColor[sc.Index]=ToolUpperExtreme.Color;
-    // sc.UseTool(ToolUpperExtreme);
-
-    // // Upper
-    // s_UseTool ToolUpper;
-    // ToolUpper.Clear();
-    // ToolUpper.ChartNumber = sc.ChartNumber;
-    // ToolUpper.DrawingType = DRAWING_HORIZONTALLINE;
-    // ToolUpper.AddMethod = UTAM_ADD_OR_ADJUST;
-    // ToolUpper.BeginValue = UpperOB.GetFloat();
-    // ToolUpper.Color = RGB(0, 0, 200); // Darker Blue
-    // ToolUpper.LineWidth = 1;
-    // ToolUpper.TransparencyLevel = 70;
-    // ToolUpper.Text = "Upper";
-    // ToolUpper.Region=1;
-    // sc.Subgraph[11][sc.Index]=ToolUpper.BeginValue;
-    // sc.Subgraph[11].DataColor[sc.Index]=ToolUpper.Color;
-    // sc.UseTool(ToolUpper);
-
-    // // Lower
-    // s_UseTool ToolLower;
-    // ToolLower.Clear();
-    // ToolLower.ChartNumber = sc.ChartNumber;
-    // ToolLower.DrawingType = DRAWING_HORIZONTALLINE;
-    // ToolLower.AddMethod = UTAM_ADD_OR_ADJUST;
-    // ToolLower.BeginValue = LowerOS.GetFloat();
-    // ToolLower.Color = RGB(200, 0, 0); // Darker Red
-    // ToolLower.LineWidth = 1;
-    // ToolLower.TransparencyLevel = 70;
-    // ToolLower.Text = "Lower";
-    // ToolLower.Region=1;
-    // sc.Subgraph[12][sc.Index]=ToolLower.BeginValue;
-    // sc.Subgraph[12].DataColor[sc.Index]=ToolLower.Color;
-    // sc.UseTool(ToolLower);
-
-    // // Lower Extreme
-    // s_UseTool ToolLowerExtreme;
-    // ToolLowerExtreme.Clear();
-    // ToolLowerExtreme.ChartNumber = sc.ChartNumber;
-    // ToolLowerExtreme.DrawingType = DRAWING_HORIZONTALLINE;
-    // ToolLowerExtreme.AddMethod = UTAM_ADD_OR_ADJUST;
-    // ToolLowerExtreme.BeginValue = LowerOSExtreme.GetFloat();
-    // ToolLowerExtreme.Color = RGB(255, 0, 0); // Red
-    // ToolLowerExtreme.LineWidth = 2;
-    // ToolLowerExtreme.TransparencyLevel = 50;
-    // ToolLowerExtreme.Text = "Lower Extreme";
-    // ToolLowerExtreme.Region=1;
-    // sc.Subgraph[13][sc.Index]=ToolLowerExtreme.BeginValue;
-    // sc.Subgraph[13].DataColor[sc.Index]=ToolLowerExtreme.Color;
-    // sc.UseTool(ToolLowerExtreme);
-
+            // Plot CNV with determined color
+    sc.Subgraph[5].DataColor[sc.Index] = candle_color;
+    sc.Subgraph[5].LineWidth=12;
+    sc.Subgraph[5][sc.Index] =sc.Volume[sc.Index];
 }
